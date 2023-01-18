@@ -40,6 +40,12 @@ options:
     type: str
     required: yes
     aliases: [ site ]
+  id:
+    description:
+    - ID for the instant assurance job to query.
+    - Optional. Ignored when state is C(present), only valid with C(query)
+    type: str
+    aliases: [ job_id ]
   state:
     description:
     - Use C(present) for triggering an instant (on-demand) assurance analysis job.
@@ -74,6 +80,7 @@ def main():
         insights_group=dict(type='str', required=True,
                             aliases=["fab_name", "ig_name"]),
         site_name=dict(type='str', required=True, aliases=["site"]),
+        id=dict(type='str', aliases=["job_id"]),
         state=dict(type='str', default='query', choices=[
                    'query', 'present']),
     )
@@ -89,11 +96,21 @@ def main():
     state = nd.params.get("state")
     insights_group = nd.params.get('insights_group')
     site_name = nd.params.get('site_name')
+    job_id = nd.params.get('id')
 
     if state == 'query':
-        analysis_history = ndi.query_instant_assurance_analysis(
-            insights_group, site_name)
-        nd.existing = analysis_history
+        if job_id:
+            analysis_history = ndi.query_instant_assurance_analysis(
+                insights_group, site_name, job_id)
+            if len(analysis_history) == 1:
+                nd.existing = analysis_history[0]
+            else:
+                nd.fail_json(
+                    msg="Instant Assurance Analysis job {0} not found".format(job_id))
+        else:
+            analysis_history = ndi.query_instant_assurance_analysis(
+                insights_group, site_name)
+            nd.existing = analysis_history
 
     elif state == 'present':
         if module.check_mode:
