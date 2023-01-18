@@ -91,14 +91,15 @@ class NDI:
         if epoch_choice:
             path = "{0}&epochStatus={1}".format(path, epoch_choice)
         entries = self.query_entry(path, size)
-        if exclude_ack_anomalies:
-            result = []
-            for entry in entries:
-                if not entry.get("acknowledged"):
+        result = []
+        for entry in entries:
+            if entry.get("severity") != "info":
+                if exclude_ack_anomalies:
+                    if not entry.get("acknowledged"):
+                        result.append(entry)
+                else:
                     result.append(entry)
-            return result
-        else:
-            return entries
+        return result
 
     def format_event_severity(self, events_severity):
         result = {}
