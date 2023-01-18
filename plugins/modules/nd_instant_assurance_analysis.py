@@ -87,7 +87,7 @@ def main():
 
     module = AnsibleModule(
         argument_spec=argument_spec,
-        supports_check_mode=True,
+        supports_check_mode=False,
     )
 
     nd = NDModule(module)
@@ -113,9 +113,6 @@ def main():
             nd.existing = analysis_history
 
     elif state == 'present':
-        if module.check_mode:
-            nd.existing = {}
-
         trigger_path = ndi.config_ig_path + "/" + \
             ndi.run_analysis_ig_path.format(insights_group, site_name)
         resp = nd.request(trigger_path, method='POST', prefix=ndi.prefix)
