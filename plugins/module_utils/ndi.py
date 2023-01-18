@@ -122,20 +122,26 @@ class NDI:
     def query_delta_analysis(self, ig_name, site_name, jobId=None, jobName=None):
         if jobId:
             delta_job_path = self.jobs_ig_path + \
-                "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData: pcvJobId AND jobId:{2})".format(
+                "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData:pcvJobId%20AND%20jobId:{2})".format(
                     ig_name, site_name, jobId)
-            entry = self.query_entry(delta_job_path, 1)
-            return entry[0]
+            entries = self.query_entry(delta_job_path, 1)
+            if len(entries) == 1:
+                return entries[0]
+            else:
+                return {}
         elif jobName:
             delta_job_path = self.jobs_ig_path + \
-                "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData: pcvJobId AND jobName:{2})".format(
+                "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData:pcvJobId%20AND%20jobName:{2})".format(
                     ig_name, site_name, jobName)
-            entry = self.query_entry(delta_job_path, 1)
-            return entry[0]
+            entries = self.query_entry(delta_job_path, 1)
+            if len(entries) == 1:
+                return entries[0]
+            else:
+                return {}
         else:
             delta_jobs_path = self.jobs_ig_path + \
-                "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData: pcvJobId)&orderBy=startTs,desc&startTs={2}".format(
-                    ig_name, site_name, jobName, 0)
+                "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData:pcvJobId)&orderBy=startTs,desc&startTs={2}".format(
+                    ig_name, site_name, 0)
             size = 1000
             path = delta_jobs_path
             # + "&count={0}&offset={1}" does not work with current implementation of query_entry
