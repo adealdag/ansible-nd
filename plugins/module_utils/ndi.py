@@ -110,7 +110,7 @@ class NDI:
                 ig_name, site_name, 0)
         if jobId:
             instant_assurance_jobs_path = instant_assurance_jobs_path + \
-                "jobId={0}".format(jobId)
+                "&jobId={0}".format(jobId)
 
         size = 1000
         path = instant_assurance_jobs_path
