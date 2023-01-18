@@ -24,6 +24,9 @@ class NDI:
         self.event_insight_group_path = "events/insightsGroup/{0}/fabric/{1}"
         self.compliance_path = "model/aciPolicy/complianceAnalysis"
         self.epoch_delta_ig_path = "epochDelta/insightsGroup/{0}/fabric/{1}/job/{2}/health/view"
+        self.run_analysis_ig_path = "{0}/fabric/{1}/runOnlineAnalysis"
+        self.run_epoch_delta_ig_path = "{0}/fabric/{1}/runEpochDelta"
+        self.jobs_ig_path = "jobs/summary.json"
 
     def get_site_id(self, ig_name, site_name, **kwargs):
         obj = self.nd.query_obj(self.config_ig_path, **kwargs)
@@ -100,6 +103,42 @@ class NDI:
                 else:
                     result.append(entry)
         return result
+
+    def query_instant_assurance_analysis(self, ig_name, site_name, jobId=None):
+        instant_assurance_jobs_path = self.jobs_ig_path + \
+            "?insightsGroupName={0}&fabricName={1}&orderBy=startTs,desc&filter=(jobType:ONLINE\-ANALYSIS* AND triggeredBy:INSTANT)&startTs={2}".format(
+                ig_name, site_name, 0)
+        if jobId:
+            instant_assurance_jobs_path = instant_assurance_jobs_path + \
+                "jobId={0}".format(jobId)
+
+        size = 100
+        path = instant_assurance_jobs_path + "&%24size={0}&%24page={1}"
+
+        entries = self.query_entry(path, size)
+        return entries
+
+    def query_delta_analysis(self, ig_name, site_name, jobId=None, jobName=None):
+        if jobId:
+            delta_job_path = self.jobs_ig_path + \
+                "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData: pcvJobId AND jobId:{2})".format(
+                    ig_name, site_name, jobId)
+            entry = self.query_entry(delta_job_path, 1)
+            return entry[0]
+        elif jobName:
+            delta_job_path = self.jobs_ig_path + \
+                "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData: pcvJobId AND jobName:{2})".format(
+                    ig_name, site_name, jobName)
+            entry = self.query_entry(delta_job_path, 1)
+            return entry[0]
+        else:
+            delta_jobs_path = self.jobs_ig_path + \
+                "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData: pcvJobId)&orderBy=startTs,desc&startTs={2}".format(
+                    ig_name, site_name, jobName, 0)
+            size = 100
+            path = delta_jobs_path + "&%24size={0}&%24page={1}"
+            entries = self.query_entry(path, size)
+            return entries
 
     def format_event_severity(self, events_severity):
         result = {}
