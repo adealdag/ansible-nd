@@ -72,8 +72,9 @@ options:
     description:
     - Use C(present) or C(absent) for creating or deleting a delta analysis job.
     - Use C(query) for querying existing delta analysis jobs.
+    - Use C(validate) to wait for completion, validate and return an error if any unacknowledged anomalies (non-info) exist
     type: str
-    choices: [ absent, present, query ]
+    choices: [ absent, present, query, validate ]
     default: query
 extends_documentation_fragment: cisco.nd.modules
 '''
@@ -95,6 +96,12 @@ EXAMPLES = r'''
     earlier_epoch_time: 2023-01-15T12:24:34Z
     later_epoch_time: 2023-01-17T18:27:34Z
     state: present
+- name: Validates a running delta analysis job
+  cisco.nd.nd_delta_analysis:
+    insights_group: exampleIG
+    site_name: siteName
+    name: testDeltaAnalysis
+    state: validate
 - name: Delete an existing delta analysis
   cisco.nd.nd_delta_analysis:
     insights_group: exampleIG
@@ -119,6 +126,13 @@ EXAMPLES = r'''
 RETURN = r'''
 '''
 
+epoch_map = {
+    'epoch2': 'EPOCH2_ONLY',
+    'epoch1': 'EPOCH1_ONLY',
+    'both_epoch': 'BOTH_EPOCHS',
+    'all': None,
+}
+
 
 def main():
     argument_spec = nd_argument_spec()
@@ -134,13 +148,13 @@ def main():
         earlier_epoch_time=dict(type='str'),
         later_epoch_time=dict(type='str'),
         state=dict(type='str', default='query', choices=[
-                   'query', 'absent', 'present'])
+                   'query', 'absent', 'present', 'validate'])
     )
 
     module = AnsibleModule(
         argument_spec=argument_spec,
         supports_check_mode=True,
-        required_if=[['state', 'absent', ['name']],
+        required_if=[['state', 'validate', ['name']],
                      ['state', 'absent', ['name']],
                      ['state', 'present', ['name']],
                      ['state', 'present', ('earlier_epoch_id',
@@ -215,6 +229,50 @@ def main():
         else:
             nd.fail_json(
                 msg="Creating delta analysis job failed")
+
+    elif state == 'validate':
+        epoch_choice = "epoch2"
+        exclude_ack_anomalies = True
+        # Wait for Epoch Delta Analysis to complete
+        while nd.existing.get('operSt') not in ["COMPLETE", "FAILED"]:
+            try:
+                nd.existing = ndi.query_delta_analysis(
+                    insights_group, site_name, jobName=name)
+                if nd.existing.get('operSt') == "FAILED":
+                    nd.fail_json(
+                        msg="Epoch Delta Analysis {0} has failed".format(name))
+                if nd.existing.get('operSt') == "COMPLETE":
+                    break
+            except BaseException:
+                nd.fail_json(
+                    msg="Epoch Delta Analysis {0} not found".format(name))
+        # Evaluate Epoch Delta Analysis
+        if nd.existing.get('operSt') == "FAILED":
+            nd.fail_json(
+                msg="Epoch Delta Analysis {0} has failed".format(name))
+
+        job_id = nd.existing.get('jobId')
+        nd.existing["anomaly_count"] = ndi.query_event_severity(
+            insights_group, site_name, job_id)
+        anomalies = ndi.query_anomalies(
+            insights_group, site_name, job_id, epoch_map[epoch_choice], exclude_ack_anomalies)
+        nd.existing["anomalies"] = anomalies
+        # nd.existing["unhealthy_resources"] = ndi.query_impacted_resource(
+        #     insights_group, site_name, job_id)
+        if anomalies:
+            minor, major, critical, warning = 0, 0, 0, 0
+            for anomaly in anomalies:
+                severity = anomaly.get("severity")
+                if severity == "minor":
+                    minor += 1
+                if severity == "major":
+                    major += 1
+                if severity == "warning":
+                    warning += 1
+                if severity == "critical":
+                    critical += 1
+            nd.fail_json(msg="Epoch Delta Analysis failed. The above {0}(critical({1})|major({2})|minor({3})|warning({4})) anomalies have been detected.".format(
+                len(anomalies), critical, major, minor, warning))
 
     elif state == 'absent':
         nd.previous = nd.existing
