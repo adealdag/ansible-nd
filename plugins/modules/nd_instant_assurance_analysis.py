@@ -82,7 +82,7 @@ def main():
         site_name=dict(type='str', required=True, aliases=["site"]),
         id=dict(type='str', aliases=["job_id"]),
         state=dict(type='str', default='query', choices=[
-                   'query', 'present']),
+                   'query', 'present'])
     )
 
     module = AnsibleModule(
