@@ -99,7 +99,7 @@ def main():
         if module.check_mode:
             nd.existing = {}
 
-        trigger_path = ndi.config_ig_path + \
+        trigger_path = ndi.config_ig_path + "/" + \
             ndi.run_analysis_ig_path.format(insights_group, site_name)
         resp = nd.request(trigger_path, method='POST', prefix=ndi.prefix)
 

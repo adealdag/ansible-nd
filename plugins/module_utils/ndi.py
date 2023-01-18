@@ -106,14 +106,15 @@ class NDI:
 
     def query_instant_assurance_analysis(self, ig_name, site_name, jobId=None):
         instant_assurance_jobs_path = self.jobs_ig_path + \
-            "?insightsGroupName={0}&fabricName={1}&orderBy=startTs,desc&filter=(jobType:ONLINE\-ANALYSIS* AND triggeredBy:INSTANT)&startTs={2}".format(
+            "?insightsGroupName={0}&fabricName={1}&orderBy=startTs,desc&filter=(jobType:ONLINE\-ANALYSIS*%20AND%20triggeredBy:INSTANT)&startTs={2}".format(
                 ig_name, site_name, 0)
         if jobId:
             instant_assurance_jobs_path = instant_assurance_jobs_path + \
                 "jobId={0}".format(jobId)
 
-        size = 100
-        path = instant_assurance_jobs_path + "&%24size={0}&%24page={1}"
+        size = 1000
+        path = instant_assurance_jobs_path
+        # + "&count={0}&offset={1}" does not work with current implementation of query_entry
 
         entries = self.query_entry(path, size)
         return entries
@@ -135,8 +136,10 @@ class NDI:
             delta_jobs_path = self.jobs_ig_path + \
                 "?jobType=EPOCH-DELTA-ANALYSIS&insightsGroupName={0}&fabricName={1}&filter=(!configData: pcvJobId)&orderBy=startTs,desc&startTs={2}".format(
                     ig_name, site_name, jobName, 0)
-            size = 100
-            path = delta_jobs_path + "&%24size={0}&%24page={1}"
+            size = 1000
+            path = delta_jobs_path
+            # + "&count={0}&offset={1}" does not work with current implementation of query_entry
+
             entries = self.query_entry(path, size)
             return entries
 
