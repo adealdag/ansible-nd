@@ -1,0 +1,309 @@
+# Test code for the ND modules
+# Copyright: (c) 2023, Alejandro de Alda (@adealdag) <adealdag@cisco.com>
+
+# GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+- name: Test that we have an Nexus Dashboard host, username and password
+  fail:
+    msg: "Please define the following variables: nd_hostname, nd_username and nd_password."
+  when: nd_hostname is not defined or nd_username is not defined or nd_password is not defined
+
+- name: Test that we have an Nexus Dashboard Insights Group and Site Name defined
+  fail:
+    msg: "Please define the following variables: ig_name, site_name."
+  when: ig_name is not defined or site_name is not defined
+
+# CLEAN ENVIRONMENT
+- name: Set vars
+  set_fact:
+    nd_info: &nd_info
+      host: "{{ nd_hostname }}"
+      username: "{{ nd_username }}"
+      password: "{{ nd_password }}"
+      validate_certs: "{{ nd_validate_certs | default(false) }}"
+      use_ssl: "{{ nd_use_ssl | default(true) }}"
+      use_proxy: "{{ nd_use_proxy | default(true) }}"
+      output_level: '{{ nd_output_level | default("info") }}'
+
+# TRIGGER DELTA ANALYSIS USING EPOCH_ID
+- name: Trigger delta analysis using epoch_id
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    earlier_epoch_id: 0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65
+    later_epoch_id: 0e5604f9-ad5b12ae-9834-348b-aed1-8ca124e32e9b
+    state: present
+  register: delta_analysis_w_uuid
+
+- name: Verify delta_analysis_w_uuid
+  assert:
+    that:
+      - delta_analysis_w_uuid is changed
+      - delta_analysis_w_uuid.current.jobName == "testDeltaAnalysis-uuid"
+      - '"priorEpochUuid=0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65" in delta_analysis_w_uuid.current.configData'
+      - '"laterEpochUuid=0e5604f9-ad5b12ae-9834-348b-aed1-8ca124e32e9b" in delta_analysis_w_uuid.current.configData'
+
+- name: Trigger same delta analysis again, and verify idempotency
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    earlier_epoch: 0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65
+    later_epoch: 0e5604f9-ad5b12ae-9834-348b-aed1-8ca124e32e9b
+    state: present
+  register: delta_analysis_w_uuid
+
+- name: Verify idempotency
+  assert:
+    that:
+      - delta_analysis_w_uuid is not changed
+
+# WAIT AND LOOP UNTIL INSTANT ANALYSIS IS COMPLETED
+- name: Wait until delta analysis is completed
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    state: query
+  register: delta_analysis_info
+  until: delta_analysis_info.current.operSt == "COMPLETE"
+  retries: 200
+  delay: 6
+
+- name: Verify delta analysis is completed
+  assert:
+    that:
+      - delta_analysis_info.current.operSt == "COMPLETE"
+
+# TRIGGER DELTA ANALYSIS USING EPOCH TIME
+- name: Trigger delta analysis using epoch_time
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-time
+    earlier_epoch_time: 2023-01-18T12:00:00.000Z
+    later_epoch_time: 2023-01-18T15:00:00.000Z
+    state: present
+  register: delta_analysis_w_time
+
+- name: Verify delta_analysis_w_time
+  assert:
+    that:
+      - delta_analysis_w_time is changed
+      - delta_analysis_w_time.current.jobName == "testDeltaAnalysis-time"
+
+# VALIDATE DELTA ANALYSIS
+- name: Validate delta analysis
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-time
+    state: validate
+  register: delta_analysis_results
+  ignore_errors: true
+
+- name: Verify delta_analysis_results
+  assert:
+    that:
+      - delta_analysis_results.current.anomalies is defined
+      - delta_analysis_results.current.anomaly_count is defined
+      # - delta_analysis_results.current.unhealthy_resources is defined
+# QUERY LIST OF INSTANT ANALYSIS
+- name: Get history of delta analysis jobs
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    state: query
+  register: delta_analysis_history
+
+- name: Verify delta analysis history not empty
+  assert:
+    that:
+      - delta_analysis_history.current | length > 0
+
+# QUERY USING ALIASES
+- name: Query delta analysis using aliases
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    ig_name: "{{ ig_name }}"
+    site: "{{ site_name }}"
+    job_name: testDeltaAnalysis-uuid
+    state: query
+
+# USE INVALID STATE OPTION
+- name: Test invalid state option
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    state: new
+  ignore_errors: true
+
+# MISSING REQUIRED PARAMETERS
+- name: Test failure when missing insights_group
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    earlier_epoch_id: 0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65
+    later_epoch_id: 0e5604f9-ad5b12ae-9834-348b-aed1-8ca124e32e9b
+    state: present
+  register: delta_analysis_failure
+  ignore_errors: true
+
+- name: Test failure when missing site_name
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    name: testDeltaAnalysis-uuid
+    earlier_epoch_id: 0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65
+    later_epoch_id: 0e5604f9-ad5b12ae-9834-348b-aed1-8ca124e32e9b
+    state: present
+  register: delta_analysis_failure
+  ignore_errors: true
+
+- name: Test failure when missing name in present
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    earlier_epoch_id: 0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65
+    later_epoch_id: 0e5604f9-ad5b12ae-9834-348b-aed1-8ca124e32e9b
+    state: present
+  register: delta_analysis_failure
+  ignore_errors: true
+
+- name: Test failure when missing name in absent
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    state: absent
+  register: delta_analysis_failure
+  ignore_errors: true
+
+- name: Test failure when missing name in validate
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    state: validate
+  register: delta_analysis_failure
+  ignore_errors: true
+
+- name: Test failure when missing epoch info
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    state: present
+  register: delta_analysis_failure
+  ignore_errors: true
+
+- name: Test failure when invalid combination of epoch info
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    earlier_epoch_id: 0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65
+    later_epoch_time: 2023-01-18T15:00:00.000Z
+    state: present
+  register: delta_analysis_failure
+  ignore_errors: true
+
+- name: Test failure when invalid combination of epoch info
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    earlier_epoch_time: 2023-01-18T15:00:00.000Z
+    later_epoch_id: 0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65
+    state: present
+  register: delta_analysis_failure
+  ignore_errors: true
+
+- name: Test failure when incomplete set of epoch info
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    earlier_epoch_time: 2023-01-18T15:00:00.000Z
+    state: present
+  register: delta_analysis_failure
+  ignore_errors: true
+
+- name: Test failure when incomplete set of epoch info
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    later_epoch_id: 0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65
+    state: present
+  register: delta_analysis_failure
+  ignore_errors: true
+
+# CHECK MODE
+- name: Test Check Mode with state present
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-check
+    earlier_epoch: 0e5604f9-53b9c234-03dc-3997-9850-501b925f7d65
+    later_epoch: 0e5604f9-ad5b12ae-9834-348b-aed1-8ca124e32e9b
+    state: present
+  register: delta_analysis_check
+  check_mode: true
+
+- name: Test Check Mode with state absent
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-check
+    state: absent
+  register: delta_analysis_check
+  check_mode: true
+
+# DELETE EXISTING DELTA ANALYSIS
+- name: Remove epoch delta testDeltaAnalysis-uuid
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-uuid
+    state: absent
+  register: delta_analysis_w_uuid
+
+- name: Verify delta_analysis_w_uuid
+  assert:
+    that:
+      - delta_analysis_w_uuid is changed
+      - delta_analysis_w_uuid.current == {}
+
+- name: Remove epoch delta testDeltaAnalysis-time
+  cisco.nd.nd_delta_analysis:
+    <<: *nd_info
+    insights_group: "{{ ig_name }}"
+    site_name: "{{ site_name }}"
+    name: testDeltaAnalysis-time
+    state: absent
+  register: delta_analysis_w_time
+
+- name: Verify delta_analysis_w_time
+  assert:
+    that:
+      - delta_analysis_w_time is changed
+      - delta_analysis_w_time.current == {}
