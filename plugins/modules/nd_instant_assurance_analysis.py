@@ -123,6 +123,8 @@ def main():
         resp = nd.request(trigger_path, method='POST', prefix=ndi.prefix)
 
         if resp["success"] is True:
+            # Added a pause to give time to NDI to create the job before querying
+            time.sleep(10)
             job_id = resp["value"]["data"]["configId"]
             analysis_history = ndi.query_instant_assurance_analysis(
                 insights_group, site_name, job_id)
