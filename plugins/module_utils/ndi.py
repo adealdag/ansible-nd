@@ -53,6 +53,12 @@ class NDI:
         obj = self.nd.query_obj(path, prefix=self.prefix)
         return obj['value']['data'][0]
 
+    def get_epoch_by_jobid(self, ig_name, site_name, job_id):
+        ig_base_path = self.event_insight_group_path.format(ig_name, site_name)
+        path = '{0}/epochs?analysisId={1}'.format(ig_base_path, job_id)
+        obj = self.nd.query_obj(path, prefix=self.prefix)
+        return obj['value']['data'][0]
+
     def query_data(self, path):
         obj = self.nd.query_obj(path, prefix=self.prefix)
         return obj['value']['data']

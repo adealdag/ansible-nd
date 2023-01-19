@@ -104,6 +104,11 @@ def main():
                 insights_group, site_name, job_id)
             if len(analysis_history) == 1:
                 nd.existing = analysis_history[0]
+                if nd.existing.get("operSt") == "COMPLETE":
+                    nd.existing["epochInfo"] = ndi.get_epoch_by_jobid(
+                        insights_group, site_name, job_id)
+                else:
+                    nd.existing["epochInfo"] = {}
             else:
                 nd.fail_json(
                     msg="Instant Assurance Analysis job {0} not found".format(job_id))
