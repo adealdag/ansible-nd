@@ -203,7 +203,7 @@ def main():
                 else:
                     nd.fail_json(
                         msg="Pre-change validation {0} already exists with configuration file {1}".format(name, pcv_file_name))
-        base_epoch_data = ndi.get_epochs(insights_group, site_name)
+        base_epoch_data = ndi.get_last_epoch(insights_group, site_name)
 
         data = {
             "allowUnsupportedObjectModification": "true",

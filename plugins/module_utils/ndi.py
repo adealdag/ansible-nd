@@ -46,7 +46,7 @@ class NDI:
                 pcv_result = obj['value']['data']
         return pcv_result
 
-    def get_epochs(self, ig_name, site_name):
+    def get_last_epoch(self, ig_name, site_name):
         ig_base_path = self.event_insight_group_path.format(ig_name, site_name)
         path = '{0}/epochs?$size=1&$status=FINISHED&%24epochType=ONLINE%2C+OFFLINE&%24sort=-collectionTime%2C-analysisStartTime'.format(
             ig_base_path)
