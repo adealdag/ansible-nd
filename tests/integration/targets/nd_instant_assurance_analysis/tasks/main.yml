@@ -47,6 +47,13 @@
   retries: 200
   delay: 6
 
+- name: Verify instant_analysis_info
+  assert:
+    that:
+      - instant_analysis_info.current.operSt == "COMPLETE"
+      - instant_analysis_info.current.epochInfo is defined
+      - instant_analysis_info.current.epochInfo.epochId is defined
+
 # QUERY LIST OF INSTANT ANALYSIS
 - name: Get history of instant assurance analysis
   cisco.nd.nd_instant_assurance_analysis:
